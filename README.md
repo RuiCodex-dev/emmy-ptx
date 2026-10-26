@@ -45,6 +45,10 @@ locking, so the times are indicative):
 | a01_attention | attention | 84.6 | 136 | 6.6e-07 |
 | a02_attention_128 | attention | 35.5 | 80 | 4.5e-07 |
 
+Measured the same way, the first working version (commit `4492e75`, before the affine
+index forms, CSE and reduction-only `fma` described below) ran `m01_matmul_512` in 30.4 us and
+`a01_attention` in 115.3 us. Both were already correct.
+
 The pointwise kernels are bit-exact (`atol = rtol = 0` is required there), and compiling any
 kernel takes about half a second, most of it importing Emmy. The full table for all 54 problems
 is in [`docs/bench.md`](docs/bench.md).
