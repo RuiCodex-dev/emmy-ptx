@@ -409,6 +409,16 @@ class CodeGen:
             out = self.ints.to_f32(out) if want == "f" else (self.ints.to_i32(out) if want == "i" else self.as_pred(out))
         self.define(s.name, out)
 
+    def s_Select(self, s) -> None:
+        """First branch whose coordinate predicate holds; built back to front as
+        a chain of ``selp`` so the earliest true predicate wins."""
+        result = None
+        for br in reversed(s.branches):
+            v = self.ints.to_f32(self.lookup(br.value))
+            c = self.as_pred(self.expr(br.select))
+            result = v if result is None else self.ints.select(c, v, result)
+        self.define(s.name, result)
+
     def s_Let(self, s) -> None:
         v = self.expr(s.value)
         if s.dtype is not None:
