@@ -360,7 +360,7 @@ class CodeGen:
             raise CompileError("iteration space exceeds int32")
         em, ints = self.em, self.ints
         em.comment(f"Tile[{', '.join(a.name for a in s.axes)}] N={n}"
-                   f" block_threads={s.block_threads}")
+                   + (f" block_threads={s.block_threads}" if s.block_threads else ""))
         tid, cta = self.env["%tid"], self.env["%ctaid"]
         bt = s.block_threads
         if s.aux_threads:
