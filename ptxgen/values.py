@@ -219,10 +219,14 @@ class IntOps:
         key = ("gaddr", base, index, esize)
         r = self._cached(key)
         if r is None:
-            idx = self.mk(index)
-            ireg = self.as_reg(idx)
-            wide = self.em.reg("rd")
-            self.em.ins(f"mul.wide.{'u32' if self.is_nonneg(idx) else 's32'}", wide, ireg, str(esize))
+            wkey = ("wide", index, esize)          # the byte offset is shared by every buffer
+            wide = self._cached(wkey)
+            if wide is None:
+                idx = self.mk(index)
+                ireg = self.as_reg(idx)
+                wide = self.em.reg("rd")
+                self.em.ins(f"mul.wide.{'u32' if self.is_nonneg(idx) else 's32'}", wide, ireg, str(esize))
+                self._remember(wkey, wide)
             r = self.em.reg("rd")
             self.em.ins("add.s64", r, base, wide)
             self._remember(key, r)
