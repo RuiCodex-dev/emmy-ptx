@@ -1,0 +1,4 @@
+emmy-ml==0.3.11
+numpy
+requests
+pytest
