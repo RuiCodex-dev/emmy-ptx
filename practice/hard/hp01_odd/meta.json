@@ -1,0 +1,63 @@
+{
+ "id": "hp01_odd",
+ "code": "x = torch.randn(1001); y = torch.randn(1001); x * y + x",
+ "rtol": 1e-06,
+ "atol": 1e-06,
+ "graph_inputs": [
+  "x",
+  "y"
+ ],
+ "graph_outputs": [
+  "add"
+ ],
+ "kernels": [
+  {
+   "node": "add",
+   "entry": "k_add_pointwise",
+   "arg_order": [
+    "y",
+    "x",
+    "add"
+   ],
+   "grid": [
+    4,
+    1,
+    1
+   ],
+   "block": [
+    256,
+    1,
+    1
+   ],
+   "smem_bytes": 0,
+   "zero_outputs": [],
+   "args": [
+    {
+     "name": "y",
+     "dtype": "f32",
+     "shape": [
+      1001
+     ],
+     "seed": 1
+    },
+    {
+     "name": "x",
+     "dtype": "f32",
+     "shape": [
+      1001
+     ],
+     "seed": 0
+    },
+    {
+     "name": "add",
+     "dtype": "f32",
+     "shape": [
+      1001
+     ],
+     "output": true
+    }
+   ],
+   "final": true
+  }
+ ]
+}

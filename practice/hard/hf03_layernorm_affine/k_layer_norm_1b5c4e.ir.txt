@@ -1,0 +1,33 @@
+    Tile[a0, a1_co] (N=4096)
+        for a1 in a1_co..768:128
+            in3 = load x[a0, a1]
+            f32 acc0 <- add(acc0, in3)
+        WarpShuffle(acc0, length=32)
+        Smem float acc0_smem[4]
+        if ((lane == 0)):
+            acc0_smem[warp] = acc0
+        Sync
+        TreeHalve(acc0, length=4, tid=warp)
+        in1 = load layer_norm_mean_count[0]
+        f32 v0 = reciprocal(in1)
+        f32 v2 = multiply(acc0, v0)
+        for a1 in 0..768
+            in4 = load x[a0, a1]
+            f32 v3 = subtract(in4, v2)
+            f32 v4 = multiply(v3, v3)
+            f32 acc1 <- add(acc1, v4)
+        in2 = load layer_norm_var_count[0]
+        f32 v1 = reciprocal(in2)
+        f32 v5 = multiply(acc1, v1)
+        in0 = load layer_norm_eps[0]
+        f32 v6 = add(in0, v5)
+        f32 v7 = rsqrt(v6)
+        for a3 in a1_co..768:128
+            in5 = load x[a0, a3]
+            f32 v8 = subtract(in5, v2)
+            f32 v9 = multiply(v7, v8)
+            in7 = load w[a3]
+            f32 v10 = multiply(in7, v9)
+            in6 = load b[a3]
+            f32 v11 = add(in6, v10)
+            layer_norm[a0, a3] = v11

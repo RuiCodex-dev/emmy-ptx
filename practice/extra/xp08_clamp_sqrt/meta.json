@@ -1,0 +1,75 @@
+{
+ "id": "xp08_clamp_sqrt",
+ "code": "x = torch.randn(1536); torch.sqrt(torch.clamp(x, min=0.0) + 0.25)",
+ "rtol": 1e-05,
+ "atol": 1e-06,
+ "graph_inputs": [
+  "x"
+ ],
+ "graph_outputs": [
+  "sqrt"
+ ],
+ "kernels": [
+  {
+   "node": "sqrt",
+   "entry": "k_sqrt_pointwise",
+   "arg_order": [
+    "clamp_bound0",
+    "add_c1",
+    "x",
+    "sqrt"
+   ],
+   "grid": [
+    2,
+    1,
+    1
+   ],
+   "block": [
+    256,
+    1,
+    1
+   ],
+   "smem_bytes": 0,
+   "zero_outputs": [],
+   "args": [
+    {
+     "name": "clamp_bound0",
+     "dtype": "f32",
+     "shape": [
+      1
+     ],
+     "data": [
+      0.0
+     ]
+    },
+    {
+     "name": "add_c1",
+     "dtype": "f32",
+     "shape": [
+      1
+     ],
+     "data": [
+      0.25
+     ]
+    },
+    {
+     "name": "x",
+     "dtype": "f32",
+     "shape": [
+      1536
+     ],
+     "seed": 0
+    },
+    {
+     "name": "sqrt",
+     "dtype": "f32",
+     "shape": [
+      1536
+     ],
+     "output": true
+    }
+   ],
+   "final": true
+  }
+ ]
+}

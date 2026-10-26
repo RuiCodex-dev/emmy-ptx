@@ -1,0 +1,38 @@
+    Tile[a0, a1, a2_co] (N=640000)
+        for a2 in a2_co..70:512
+            in0 = load x0[a0, a2]
+            in1 = load x1[a2, a1]
+            f32 v0 = multiply(in0, in1)
+            f32 acc0 <- add(acc0, v0)
+            in0__r1 = load x0[a0, ((a2 + 128) % 70)]
+            in1__r1 = load x1[((a2 + 128) % 70), a1]
+            f32 v0__r1 = multiply(in0__r1, in1__r1)
+            Init(f32 v0__r1__id = 0.0)
+            v0__r1__m = v0__r1 when (((a2 + 128) < 70))
+                        v0__r1__id when (1)
+            f32 acc0__r1 <- add(acc0__r1, v0__r1__m)
+            in0__r2 = load x0[a0, ((a2 + 256) % 70)]
+            in1__r2 = load x1[((a2 + 256) % 70), a1]
+            f32 v0__r2 = multiply(in0__r2, in1__r2)
+            Init(f32 v0__r2__id = 0.0)
+            v0__r2__m = v0__r2 when (((a2 + 256) < 70))
+                        v0__r2__id when (1)
+            f32 acc0__r2 <- add(acc0__r2, v0__r2__m)
+            in0__r3 = load x0[a0, ((a2 + 384) % 70)]
+            in1__r3 = load x1[((a2 + 384) % 70), a1]
+            f32 v0__r3 = multiply(in0__r3, in1__r3)
+            Init(f32 v0__r3__id = 0.0)
+            v0__r3__m = v0__r3 when (((a2 + 384) < 70))
+                        v0__r3__id when (1)
+            f32 acc0__r3 <- add(acc0__r3, v0__r3__m)
+        f32 acc0 <- add(acc0, acc0__r1)
+        f32 acc0 <- add(acc0, acc0__r2)
+        f32 acc0 <- add(acc0, acc0__r3)
+        WarpShuffle(acc0, length=32)
+        Smem float acc0_smem[4]
+        if ((lane == 0)):
+            acc0_smem[warp] = acc0
+        Sync
+        TreeHalve(acc0, length=4, tid=warp)
+        if ((a2_co == 0)):
+            matmul[a0, a1] = acc0

@@ -1,0 +1,86 @@
+{
+ "id": "xp01_gelu",
+ "code": "torch.nn.functional.gelu(torch.randn(3000))",
+ "rtol": 0.0001,
+ "atol": 1e-05,
+ "graph_inputs": [
+  "x"
+ ],
+ "graph_outputs": [
+  "gelu"
+ ],
+ "kernels": [
+  {
+   "node": "gelu",
+   "entry": "k_gelu_pointwise",
+   "arg_order": [
+    "gelu_inv_sqrt2",
+    "gelu_one",
+    "gelu_half",
+    "x",
+    "gelu"
+   ],
+   "grid": [
+    3,
+    1,
+    1
+   ],
+   "block": [
+    256,
+    1,
+    1
+   ],
+   "smem_bytes": 0,
+   "zero_outputs": [],
+   "args": [
+    {
+     "name": "gelu_inv_sqrt2",
+     "dtype": "f32",
+     "shape": [
+      1
+     ],
+     "data": [
+      0.7071067811865475
+     ]
+    },
+    {
+     "name": "gelu_one",
+     "dtype": "f32",
+     "shape": [
+      1
+     ],
+     "data": [
+      1.0
+     ]
+    },
+    {
+     "name": "gelu_half",
+     "dtype": "f32",
+     "shape": [
+      1
+     ],
+     "data": [
+      0.5
+     ]
+    },
+    {
+     "name": "x",
+     "dtype": "f32",
+     "shape": [
+      3000
+     ],
+     "seed": 0
+    },
+    {
+     "name": "gelu",
+     "dtype": "f32",
+     "shape": [
+      3000
+     ],
+     "output": true
+    }
+   ],
+   "final": true
+  }
+ ]
+}

@@ -1,0 +1,87 @@
+{
+ "id": "xp04_bias_2d",
+ "code": "x = torch.randn(64, 96); b = torch.randn(96); (x + b) * 3.0 - 1.5",
+ "rtol": 1e-06,
+ "atol": 1e-06,
+ "graph_inputs": [
+  "x",
+  "b"
+ ],
+ "graph_outputs": [
+  "sub"
+ ],
+ "kernels": [
+  {
+   "node": "sub",
+   "entry": "k_sub_pointwise",
+   "arg_order": [
+    "sub_c1",
+    "mul_c1",
+    "b",
+    "x",
+    "sub"
+   ],
+   "grid": [
+    6,
+    1,
+    1
+   ],
+   "block": [
+    256,
+    1,
+    1
+   ],
+   "smem_bytes": 0,
+   "zero_outputs": [],
+   "args": [
+    {
+     "name": "sub_c1",
+     "dtype": "f32",
+     "shape": [
+      1
+     ],
+     "data": [
+      1.5
+     ]
+    },
+    {
+     "name": "mul_c1",
+     "dtype": "f32",
+     "shape": [
+      1
+     ],
+     "data": [
+      3.0
+     ]
+    },
+    {
+     "name": "b",
+     "dtype": "f32",
+     "shape": [
+      96
+     ],
+     "seed": 1
+    },
+    {
+     "name": "x",
+     "dtype": "f32",
+     "shape": [
+      64,
+      96
+     ],
+     "seed": 0
+    },
+    {
+     "name": "sub",
+     "dtype": "f32",
+     "shape": [
+      64,
+      96
+     ],
+     "output": true
+    }
+   ],
+   "final": true
+  }
+ ]
+}

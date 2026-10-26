@@ -1,0 +1,63 @@
+{
+ "id": "xp02_sigmoid_mul",
+ "code": "x = torch.randn(1000); y = torch.randn(1000); torch.sigmoid(x) * y",
+ "rtol": 0.0001,
+ "atol": 1e-05,
+ "graph_inputs": [
+  "x",
+  "y"
+ ],
+ "graph_outputs": [
+  "mul"
+ ],
+ "kernels": [
+  {
+   "node": "mul",
+   "entry": "k_mul_pointwise",
+   "arg_order": [
+    "x",
+    "y",
+    "mul"
+   ],
+   "grid": [
+    2,
+    1,
+    1
+   ],
+   "block": [
+    256,
+    1,
+    1
+   ],
+   "smem_bytes": 0,
+   "zero_outputs": [],
+   "args": [
+    {
+     "name": "x",
+     "dtype": "f32",
+     "shape": [
+      1000
+     ],
+     "seed": 0
+    },
+    {
+     "name": "y",
+     "dtype": "f32",
+     "shape": [
+      1000
+     ],
+     "seed": 1
+    },
+    {
+     "name": "mul",
+     "dtype": "f32",
+     "shape": [
+      1000
+     ],
+     "output": true
+    }
+   ],
+   "final": true
+  }
+ ]
+}

@@ -1,0 +1,67 @@
+{
+ "id": "hp02_3d_bcast",
+ "code": "x = torch.randn(8, 16, 32); b = torch.randn(32); torch.relu(x - b)",
+ "rtol": 0,
+ "atol": 0,
+ "graph_inputs": [
+  "x",
+  "b"
+ ],
+ "graph_outputs": [
+  "relu"
+ ],
+ "kernels": [
+  {
+   "node": "relu",
+   "entry": "k_relu_pointwise",
+   "arg_order": [
+    "b",
+    "x",
+    "relu"
+   ],
+   "grid": [
+    4,
+    1,
+    1
+   ],
+   "block": [
+    256,
+    1,
+    1
+   ],
+   "smem_bytes": 0,
+   "zero_outputs": [],
+   "args": [
+    {
+     "name": "b",
+     "dtype": "f32",
+     "shape": [
+      32
+     ],
+     "seed": 1
+    },
+    {
+     "name": "x",
+     "dtype": "f32",
+     "shape": [
+      8,
+      16,
+      32
+     ],
+     "seed": 0
+    },
+    {
+     "name": "relu",
+     "dtype": "f32",
+     "shape": [
+      8,
+      16,
+      32
+     ],
+     "output": true
+    }
+   ],
+   "final": true
+  }
+ ]
+}
