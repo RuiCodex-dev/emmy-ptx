@@ -125,7 +125,7 @@ def compile_file(ir_path: str | Path) -> str:
         smem_lines.append(".extern .shared .align 16 .b8 smem_pool[];"
                           f"  // {total} bytes, sized at launch")
         for b, off, _ in placed:
-            b.base = f"smem_pool+{off}" if off else "smem_pool"
+            b.base, b.base_off = "smem_pool", off
             buffers[b.name] = b
     else:
         for b, _, align in placed:

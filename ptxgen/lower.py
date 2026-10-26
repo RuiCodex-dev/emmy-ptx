@@ -21,7 +21,7 @@ import math
 
 from .emitter import Emitter, f32_hex
 from .ops import FloatOps
-from .values import F, I, IntOps, Val
+from .values import F, I, IntOps, Lin, Val
 
 ESIZE = {"f32": 4, "float": 4, "i32": 4, "int": 4}
 
@@ -76,7 +76,8 @@ class Buffer:
         self.shape = tuple(int(d) for d in shape)
         self.dtype = dtype
         self.space = space            # "global" or "shared"
-        self.base = ""                # global: 64-bit base register; shared: symbol (+ offset)
+        self.base = ""                # global: 64-bit base register; shared: symbol
+        self.base_off = 0             # shared buffers carved from the dynamic pool: byte offset
         self.readonly = False
         if dtype not in ESIZE:
             raise CompileError(f"buffer {name!r} has dtype {dtype!r}; only 32-bit buffers are supported")
@@ -106,13 +107,17 @@ class CodeGen:
         """Bind an IR name.  An existing name keeps its register (mov into it);
         a new name takes over ``val``'s register if nobody owns it yet."""
         cur = self.env.get(name)
-        if cur is not None and not cur.is_const and self.owner.get(cur.v) == name:
+        if cur is not None and cur.is_reg and self.owner.get(cur.v) == name:
             if cur.kind != val.kind:
                 val = self.ints.to_f32(val) if cur.kind == "f" else self.ints.to_i32(val)
             if val != cur:
                 self._mov(cur, val)
+                if cur.kind == "i":
+                    self.ints.forget_all()   # cached index math may have read the old value
             return
-        if not val.is_const and val.v not in self.owner:
+        if val.kind == "i" and not val.is_const and not val.is_reg:
+            val = I(self.ints.as_reg(val))   # names hold registers, never affine forms
+        if val.is_reg and val.v not in self.owner:
             self.owner[val.v] = name
             self.env[name] = val
             return
@@ -131,7 +136,7 @@ class CodeGen:
         if dst.kind == "f":
             self.em.ins("mov.f32", dst.v, src.text())
         elif dst.kind == "i":
-            self.em.ins("mov.u32", dst.v, src.text())
+            self.em.ins("mov.u32", dst.v, self.ints.operand(src))
         else:
             self.em.ins("mov.pred", dst.v, self.ints.as_reg(src))
 
@@ -244,25 +249,24 @@ class CodeGen:
         return self.flatten(buf, [self.ints.to_i32(self.expr(e)) for e in index])
 
     def address(self, buf: Buffer, flat: Val, extra_bytes: int = 0) -> str:
-        """A PTX address operand for element ``flat`` of ``buf`` (+ a byte offset)."""
-        if buf.space == "shared":
-            if flat.is_const:
-                off = int(flat.v) * buf.esize + extra_bytes
-                return f"[{buf.base}+{off}]" if off else f"[{buf.base}]"
-            byte = self.ints.mul(flat, I(buf.esize))
-            base = self.em.reg("r")
-            self.em.ins("mov.u32", base, buf.base)
-            a = self.em.reg("r")
-            self.em.ins("add.s32", a, base, byte.v)
-            return f"[{a}+{extra_bytes}]" if extra_bytes else f"[{a}]"
-        if flat.is_const:
-            off = int(flat.v) * buf.esize + extra_bytes
-            return f"[{buf.base}+{off}]" if off else f"[{buf.base}]"
-        wide = self.em.reg("rd")
-        self.em.ins(f"mul.wide.{'u32' if self.ints.is_nonneg(flat) else 's32'}", wide, flat.v, str(buf.esize))
-        a = self.em.reg("rd")
-        self.em.ins("add.s64", a, buf.base, wide)
-        return f"[{a}+{extra_bytes}]" if extra_bytes else f"[{a}]"
+        """A PTX address operand for element ``flat`` of ``buf`` (+ a byte offset).
+
+        The index is split into its variable part, which goes into a (cached)
+        base register, and its constant part, which becomes the immediate
+        offset: ``x[a0*4 + 3]`` is ``[%rd9+12]`` with ``%rd9 = x + a0*16``."""
+        lin = self.ints.lin(flat)
+        off = lin.const * buf.esize + extra_bytes + buf.base_off
+        var = Lin(lin.terms, 0)
+        if not var.terms:
+            base = buf.base
+        elif buf.space == "shared":
+            sym = self.ints.sym_reg(buf.base)
+            base = self.ints.as_reg(self.ints.add(I(sym), self.ints.scale(self.ints.mk(var), buf.esize)))
+        else:
+            base = self.ints.global_addr(buf.base, var, buf.esize)
+        if off > 0:
+            return f"[{base}+{off}]"
+        return f"[{base}-{-off}]" if off < 0 else f"[{base}]"
 
     def swizzle(self, mode: str, flat: Val) -> Val:
         """Emmy's software smem swizzle: e ^ (((e >> shift) & mask) << 3)."""
@@ -531,22 +535,22 @@ class CodeGen:
                     self.body(body)
                 return
         # a real loop: the induction variable is one register, the test at the top
+        step_op, end_op = ints.operand(step), ints.operand(end)
         reg = em.reg("r")
-        em.ins("mov.u32", reg, start.text(), comment=f"for {var} = {start.text()} .. {end.text()} step {step.text()}")
+        em.ins("mov.u32", reg, ints.operand(start), comment=f"for {var} (step {step_op}, end {end_op})")
         if ints.is_nonneg(start) and ints.is_nonneg(step):
             ints.nonneg.add(reg)
         self.env[var] = I(reg)
         self.owner[reg] = var
         head, done = em.label(f"{var}_head"), em.label(f"{var}_done")
         em.place(head)
-        p = ints.cmp("ge", I(reg), end)
-        if p.is_const:
-            if p.v:
-                em.ins("bra", done)
-        else:
-            em.ins("bra", done, pred=p.v)
+        p = em.reg("p")
+        em.ins("setp.ge.s32", p, reg, end_op)
+        em.ins("bra", done, pred=p)
+        ints.push()          # values computed in the body do not outlive one iteration
         self.body(body)
-        em.ins("add.s32", reg, reg, step.text())
+        ints.pop()
+        em.ins("add.s32", reg, reg, step_op)
         em.ins("bra.uni", head)
         em.place(done)
 
@@ -558,11 +562,15 @@ class CodeGen:
         em = self.em
         els, end = em.label("else"), em.label("endif")
         em.ins("bra", els if s.else_body else end, pred="!" + c.v)
+        self.ints.push()     # a value computed in one arm is not available after the join
         self.body(s.body)
+        self.ints.pop()
         if s.else_body:
             em.ins("bra.uni", end)
             em.place(els)
+            self.ints.push()
             self.body(s.else_body)
+            self.ints.pop()
         em.place(end)
 
     # ---- shared memory and barriers ----------------------------------------------
@@ -649,6 +657,7 @@ class CodeGen:
             p = ints.cmp("ge", tid, I(half))
             if not p.is_const:
                 em.ins("bra", skip, pred=p.v)
+            ints.push()
             if not (p.is_const and p.v):
                 mine, other = slot_of(tid), slot_of(ints.add(tid, I(half)))
                 for buf, st, sb in zip(s.bufs, s.state, s.state_b):
@@ -661,6 +670,7 @@ class CodeGen:
                 self._combine(s.combine_states, s.dtype)
                 for buf, st in zip(s.bufs, s.state):
                     em.ins("st.shared.f32", self.address(self.buffer(buf), mine), self.ints.as_reg(self.lookup(st)))
+            ints.pop()
             em.place(skip)
             em.ins(*bar)
             half //= 2
