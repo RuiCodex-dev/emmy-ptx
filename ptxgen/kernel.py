@@ -165,6 +165,7 @@ def compile_file(ir_path: str | Path) -> str:
         cg.ints.nonneg.add(r)
     cg.env.update({"%tid": I(tid), "%ctaid": I(cta), "lane": I(lane), "warp": I(warp), "tid": I(tid)})
 
+    cg.count_uses(op.body)
     cg.body(op.body)
     em.ins("ret")
 

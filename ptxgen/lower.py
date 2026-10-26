@@ -38,6 +38,11 @@ _BUILTINS = {"threadIdx.x": "%tid.x", "threadIdx.y": "%tid.y", "threadIdx.z": "%
              "gridDim.x": "%nctaid.x", "gridDim.y": "%nctaid.y", "gridDim.z": "%nctaid.z"}
 
 
+# statement fields that DEFINE names rather than read them (ignored when counting uses)
+_DEF_FIELDS = {"Assign": ("name",), "Let": ("name",), "Init": ("name",), "Load": ("names",),
+               "Select": ("name",)}
+
+
 class CompileError(Exception):
     pass
 
@@ -93,6 +98,31 @@ class CodeGen:
         self.launch_block = launch_block
         self.env: dict[str, Val] = {}
         self.owner: dict[str, str] = {}   # register -> the IR name that owns it
+        self.uses: dict[str, int] = {}    # IR name -> number of references (see count_uses)
+
+    def count_uses(self, stmts) -> None:
+        """Count every reference to every name, conservatively: any string field
+        or ``Var`` anywhere in a statement counts, except a statement's own
+        definition target.  Over-counting only ever disables a fusion."""
+        import dataclasses
+
+        def visit(x, skip=None):
+            if isinstance(x, str):
+                if x != skip:
+                    self.uses[x] = self.uses.get(x, 0) + 1
+            elif isinstance(x, (list, tuple)):
+                for y in x:
+                    visit(y)
+            elif dataclasses.is_dataclass(x) and not isinstance(x, type):
+                defines = _DEF_FIELDS.get(_tname(x), ())
+                for f in dataclasses.fields(x):
+                    if f.name not in defines:
+                        visit(getattr(x, f.name))
+            elif hasattr(x, "__iter__") and not isinstance(x, (bytes, dict)):
+                for y in x:
+                    visit(y)
+
+        visit(stmts)
 
     # ======================================================================
     # names
@@ -290,11 +320,37 @@ class CodeGen:
     # statements
     # ======================================================================
     def body(self, stmts) -> None:
-        for s in stmts:
+        stmts = list(stmts)
+        i = 0
+        while i < len(stmts):
+            s = stmts[i]
+            if i + 1 < len(stmts) and self._fuse_mul_accum(s, stmts[i + 1]):
+                i += 2
+                continue
             handler = getattr(self, "s_" + _tname(s), None)
             if handler is None:
                 raise CompileError(f"statement {_tname(s)} is not supported by this compiler")
             handler(s)
+            i += 1
+
+    def _fuse_mul_accum(self, s, nxt) -> bool:
+        """``t = a * b; acc <- add(acc, t)`` -> ``acc = fma(a, b, acc)``.
+
+        Only for an Accum (a reduction, always graded with a tolerance because
+        summation order is free) and only when the product is used nowhere
+        else, so pointwise kernels keep numpy's two-rounding semantics."""
+        if not (_tname(s) == "Assign" and _tname(nxt) == "Accum"):
+            return False
+        if s.op.name != "multiply" or nxt.op.name != "add" or nxt.value != s.name:
+            return False
+        if self.uses.get(s.name, 0) != 1 or len(s.args) != 2:
+            return False
+        a, b = (self.lookup(x) for x in s.args)
+        if a.kind != "f" or b.kind != "f" or nxt.name not in self.env:
+            return False
+        base = self.lookup(nxt.base) if nxt.base else self.lookup(nxt.name)
+        self.define(nxt.name, self.fl.fma(a, b, base))
+        return True
 
     # ---- launch geometry -------------------------------------------------------
     def s_Tile(self, s) -> None:
