@@ -3,6 +3,9 @@
 A compiler from [Emmy](https://github.com/cloudrift-ai/emmy)'s Kernel IR straight to NVIDIA PTX,
 written for the [RiftStack Emmy Hackathon 2026](https://riftstack.ai/hackathon).
 
+**Walkthrough video (4:17):** https://youtu.be/gAf68wReyek. The narration is a disclosed synthetic voice
+reading the author's own script, because the author was unwell; RiftStack approved this in writing.
+
 ```bash
 python compile.py path/to/kernel.ir.json > out.ptx
 ```
